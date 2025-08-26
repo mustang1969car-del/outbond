@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2025 Dark Aesthetic Calendar with Google Sheets Integration</title>
+    <style>
+        /* Global smooth scroll for page */
+        html, body {
+            scroll-behavior: smooth;
+        }
+
+        :root {
+            --bg: #06060a;
+            --bg-soft: #0b0b12;
+            --glass: rgba(255, 255, 255, .06);
+            --text: #e8e8f0;
+            --muted: #a2a2b8;
+            --accent: #6ee7ff;
+            --accent-2: #a78bfa;
+            --radius: 22px;
+            /* New colors derived from the Google Sheet image, adapted for dark theme */
+            --header-blue-light: rgba(110, 231, 255, 0.15); /* Light blue 2 equivalent for dark theme */
+            --header-orange-dark: rgba(255, 165, 0, 0.2); /* Darker orange/brown equivalent */
+            --footer-green-light: rgba(144, 238, 144, 0.15); /* Light green equivalent */
+            --cell-bg-default: rgba(255, 255, 255, 0.01); /* Very subtle background for content cells */
+            --grid-border-color: rgba(255, 255, 255, .08); /* Border color for grid and cells */
+
+            /* Defined default cell sizes in CM (kept for reference, but using fr for grid-template-columns) */
+            --default-content-cell-height-cm: 0.45cm;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text);
+            display: grid;
+            place-items: center;
+            font-family: sans-serif;
+            background: radial-gradient(1200px 800px at 15% 10%, rgba(102, 126, 234, .18), transparent 60%),
+                radial-gradient(1200px 800px at 85% 90%, rgba(118, 75, 162, .18), transparent 60%),
+                radial-gradient(800px 600px at 80% 20%, rgba(110, 231, 255, .12), transparent 60%), var(--bg);
+        }
+
+        .wrap {
+            width: 95vw;
+            height: 95vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02));
+            -webkit-backdrop-filter: blur(10px); /* Safari support */
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .header h1 {
+            margin: 0;
+            cursor: pointer;
+        }
+        
+        .header button {
+            background: var(--glass);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, .1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .months-container {
+            flex-grow: 1;
+            overflow-y: scroll; /* यह कंटेनर को वर्टिकल स्क्रॉलिंग करने की अनुमति देता है */
+            scroll-behavior: smooth;
+            /* Added to ensure scrolling works reliably across different screen sizes */
+            max-height: calc(100vh - 150px); 
+            /* You can adjust '150px' based on your header/footer height */
+        }
+        
+        .months {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            padding-right: 15px;
+        }
+        
+        .month {
+            background: var(--glass);
+            border-radius: 18px;
+            padding: 12px;
+        }
+
+        .month-name {
+            font-weight: 700;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .weekday {
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .day {
+            text-align: center;
+            padding: 8px 0;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .day.today {
+            background: linear-gradient(180deg, rgba(110, 231, 255, .22), rgba(167, 139, 250, .18));
+        }
+
+        .day:not(.muted):hover {
+            background: rgba(255, 255, 255, .06);
+        }
+
+        .day.has-note {
+            position: relative;
+        }
+        .day.has-note::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background-color: var(--accent);
+            border-radius: 50%;
+        }
+
+        /* General Popup styles */
+        .popup-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000; /* Ensure popups are on top */
+        }
+
+        .popup {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02));
+            -webkit-backdrop-filter: blur(10px); /* Safari support */
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, .08);
+        }
+
+        /* Note Popup styles - Increased size to accommodate the large grid */
+        #notePopup {
+            width: 95vw; /* Increased width */
+            min-height: 0; /* Allow flex item to shrink */
+            max-height: 95vh; /* Max height to prevent overflow on smaller screens */
+            overflow: hidden; /* Hide any overflow within the popup itself */
+            max-width: 1400px; /* Further increased max width */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        #notePopup .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        #notePopup .popup-header h3 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+
+        /* Sheet Grid styles */
+        .sheet-grid-container {
+            flex-grow: 1; /* Take all available space in the column flex parent */
+            overflow: auto; /* This container should scroll its content */
+            border: 1px solid var(--grid-border-color); /* Border for the grid container */
+            border-radius: 8px; /* Slightly smaller radius for grid */
+            background: var(--glass); /* Glass effect for the grid background */
+            -webkit-backdrop-filter: blur(10px); /* Safari support */
+            backdrop-filter: blur(10px);
+            box-sizing: border-box;
+            width: 100%;
+            min-height: 0; /* Allow flex item to shrink if needed */
+        }
+
+        #sheetGrid { /* This is the actual grid content */
+            scroll-behavior: smooth; /* Smooth scroll for grid content */
+            will-change: transform;  /* Performance optimization for scrolling/animations */
+            display: grid;
+            grid-template-columns: 2fr repeat(14, 1fr) 2fr; /* Use fr for responsiveness */
+            min-width: 100%; /* Ensure grid stretches to fill container's minimum width */
+            min-height: 100%; /* Ensure grid stretches to fill container's minimum height */
+            box-sizing: border-box;
+        }
+
+        .sheet-cell {
+            border: 1px solid var(--grid-border-color); /* Thin border for cells */
+            display: flex;
+            align-items: center; /* Center vertically */
+            justify-content: center; /* Center horizontally */
+            padding: 2px; /* Reduced padding to fit smaller heights and font sizes */
+            color: var(--text);
+            white-space: pre-wrap; /* Preserve whitespace and wrap text */
+            word-break: break-all; /* Break long words */
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
+            background: var(--cell-bg-default); /* Very subtle background for content cells */
+            transition: background 0.2s, border-color 0.2s; /* Smooth transitions */
+            font-weight: bold; /* Default bold for all cells as requested for cells in Google Sheet-like design */
+            font-size: 11px; /* Default font size for non-merged content cells */
+            min-height: var(--default-content-cell-height-cm); /* Default min-height for content cells */
+        }
+        .sheet-cell:focus {
+            outline: 1px solid var(--accent); /* Highlight on focus */
+            background: rgba(255, 255, 255, .04); /* Slightly brighter on focus */
+        }
+
+        /* Specific sheet cell colors and heights based on the image and user's new instructions */
+        /* A1:O1 Merged Cell */
+        .sheet-cell.header-top-merged {
+            background-color: var(--header-blue-light);
+            font-size: 18px; /* Specific font size */
+            min-height: 21px; /* Specific height for this row (P1 height) */
+        }
+        /* P1 Cell (Total SKU) */
+        .sheet-cell.total-sku-cell {
+            background-color: var(--header-blue-light);
+            font-weight: bold;
+            font-size: 18px; /* Specific font size */
+            min-height: 21px; /* Specific height for this row */
+        }
+
+        /* A2:A5 Merged Cell - height now calculated based on 4 rows of 0.45cm */
+        .sheet-cell.header-left-A2-A5 {
+            background-color: var(--header-orange-dark);
+            font-size: 18px; /* Merged cell font size */
+        }
+
+        /* A column general merged cells (e.g., A6:A8, A9:A11 etc.) */
+        .sheet-cell.header-left-general {
+            background-color: var(--header-orange-dark);
+            font-size: 18px; /* Merged cell font size */
+        }
+
+        /* Footer row A37:O37 Merged Cell */
+        .sheet-cell.footer-bottom-merged {
+            background-color: var(--footer-green-light);
+            min-height: 73px; /* Specific height for this row */
+            font-size: 18px; /* Merged cell font size */
+        }
+        /* P37 Cell */
+        .sheet-cell.footer-bottom-P37 {
+            background-color: var(--footer-green-light);
+            min-height: 73px; /* Specific height for this row */
+            font-size: 18px; /* Merged cell font size */
+        }
+
+        /* P column merged cells (e.g., P2:P5, P6:P8 etc.) - height now calculated based on row span */
+        .sheet-cell.p-column-merged {
+            background-color: rgba(255, 255, 255, 0.05); /* Slightly different background for P-column merges */
+            font-size: 18px; /* Merged cell font size */
+        }
+
+        #notePopup .popup-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        #notePopup button {
+            padding: 10px 18px;
+            border-radius: 8px;
+            background: var(--glass);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, .1);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #notePopup button:hover {
+            background: rgba(255, 255, 255, .1);
+        }
+
+        /* Year Popup styles */
+        #yearPopup {
+            width: 300px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 80vh;
+            overflow-y: auto;
+            align-items: center;
+        }
+        #yearPopup .year-item {
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 8px;
+            transition: opacity 0.2s;
+            width: 100%;
+        }
+        #yearPopup .year-item:hover {
+            background: var(--glass);
+            border-radius: 8px;
+        }
+        #yearPopup .year-item.active {
+            font-weight: bold;
+            opacity: 1;
+            color: var(--accent);
+        }
+        #yearPopup .year-item.muted {
+            opacity: 0.5;
+        }
+        #yearPopup-close-btn {
+            background: var(--glass);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, .1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        /* Custom message box for alerts */
+        #messageBoxOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001; /* Higher than other popups */
+        }
+        #messageBox {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02));
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            text-align: center;
+            width: 300px;
+        }
+        #messageBox p {
+            margin-bottom: 20px;
+        }
+        #messageBox button {
+            background: var(--glass);
+            color: var(--text);
+            border: 1px solid rgba(255, 255, 255, .1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1002;
+            color: var(--text);
+            font-size: 1.5em;
+        }
+        /* Google Auth specific styles */
+        #googleAuthStatus {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 0.8em;
+            color: var(--muted);
+            background: rgba(255,255,255,0.05);
+            padding: 5px 10px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        #authButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 10;
+            font-weight: bold;
+        }
+        #authButton.signed-out {
+            background-color: #dc2626; /* Red for sign out */
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="card">
+            <header class="header">
+                <button id="prevYearBtn">&lt;</button>
+                <h1 id="yearDisplay">2025</h1>
+                <button id="nextYearBtn">&gt;</button>
+            </header>
+            <div id="googleAuthStatus">Not signed in</div>
+            <button id="authButton">Sign In with Google</button>
+            <section class="months-container" id="monthsContainer">
+                <div class="months" id="months"></div>
+            </section>
+        </div>
+    </div>
+    
+    <!-- Note Popup -->
+    <div class="popup-overlay" id="notePopupOverlay">
+        <div class="popup" id="notePopup">
+            <div class="popup-header">
+                <h3 id="popupDate"></h3>
+            </div>
+            <!-- Grid container replaces the textarea -->
+            <div id="sheetGridContainer" class="sheet-grid-container">
+                <div id="sheetGrid" class="sheet-grid"></div>
+            </div>
+            <div class="popup-buttons">
+                <button id="saveBtn">Save</button>
+                <button id="updateBtn" style="display:none;">Update</button>
+                <button id="cancelBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Year Selection Popup -->
+    <div class="popup-overlay" id="yearPopupOverlay">
+        <div class="popup" id="yearPopup">
+            <div id="yearList"></div>
+            <button id="yearPopup-close-btn">Close</button>
+        </div>
+    </div>
+
+    <!-- Custom Message Box -->
+    <div class="popup-overlay" id="messageBoxOverlay">
+        <div class="popup" id="messageBox">
+            <p id="messageBoxText"></p>
+            <button id="messageBoxCloseBtn">OK</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">Saving/Loading data...</div>
+
+    <!-- Google API Client Library -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    
+    <script type="module">
+        // --- Google API Configuration ---
+        // IMPORTANT: Replace these with your actual values from Google Cloud Console
+        const CLIENT_ID = '942271371359-d7fkbhdlhb1f73fu1pi73a1ro6ou07rs.apps.googleusercontent.com'; // <--- आपकी CLIENT_ID
+        const API_KEY = 'AIzaSyBIHx7EYGtixCjkuFjJTEL5z3DuNd0NZ58';     // <--- आपकी API_KEY
+        const SPREADSHEET_ID = '1abHPk5x4n0rgIY-t20IntDsH9Rce4JwRny2CW0y9iyQ'; // <--- आपकी SPREADSHEET_ID
+        
+        const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+        const SCOPES = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file"; // Drive.file for creating/managing its own file, sheets for read/write
+        // --- End Google API Configuration ---
+
+        // Global Google Auth variables
+        let gapiInited = false;
+        let gisInited = false;
+        let googleUser = null; // Stores the authenticated user
+        let tokenClient; // Stores the token client for Google Identity Services
+
+        // DOM Elements
+        const monthsEl = document.getElementById('months');
+        const monthsContainer = document.getElementById('monthsContainer');
+        const yearDisplay = document.getElementById('yearDisplay');
+        const prevYearBtn = document.getElementById('prevYearBtn'); 
+        const nextYearBtn = document.getElementById('nextYearBtn');
+        const notePopupOverlay = document.getElementById('notePopupOverlay');
+        const yearPopupOverlay = document.getElementById('yearPopupOverlay');
+        const popupDate = document.getElementById('popupDate');
+        const saveBtn = document.getElementById('saveBtn');
+        const updateBtn = document.getElementById('updateBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const yearListEl = document.getElementById('yearList');
+        const yearPopupCloseBtn = document.getElementById('yearPopup-close-btn');
+        const messageBoxOverlay = document.getElementById('messageBoxOverlay');
+        const messageBoxText = document.getElementById('messageBoxText');
+        const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const googleAuthStatus = document.getElementById('googleAuthStatus');
+        const authButton = document.getElementById('authButton');
+
+        // New grid elements
+        const sheetGridContainer = document.getElementById('sheetGridContainer');
+        const sheetGrid = document.getElementById('sheetGrid');
+
+        // Calendar data
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const current = new Date();
+        let currentYear = 2025;
+        let selectedDateKey = '';
+        
+        // Grid dimensions based on the provided image (A1 to P37)
+        const GRID_ROWS = 37; // Total rows from 1 to 37
+        const GRID_COLS = 16; // Total columns from A to P
+        let currentGridData = []; // 2D array to hold grid content
+
+        // Define base unit for unmerged content cells (B2:O36)
+        const DEFAULT_CONTENT_CELL_HEIGHT_CM = 0.45; // Height for a single row content cell
+
+        // Define merged cell configurations
+        // Format: { r, c, rowSpan, colSpan, className (optional), specificHeight (optional), text (optional), editable (optional), calculatedHeight (boolean) }
+        const MERGED_CELLS = [
+            // A1:O1 (merged header)
+            { r: 0, c: 0, rowSpan: 1, colSpan: 15, className: 'header-top-merged', specificHeight: '21px', editable: true }, 
+            // P1 (Total SKU)
+            { r: 0, c: 15, rowSpan: 1, colSpan: 1, className: 'total-sku-cell', specificHeight: '21px', text: 'Total SKU', editable: false },
+            
+            // A2:A5 (merged) - Height now calculated based on 4 rows of 0.45cm
+            { r: 1, c: 0, rowSpan: 4, colSpan: 1, className: 'header-left-A2-A5', calculatedHeight: true, editable: true },
+
+            // A column merged cells (A6:A8 etc.)
+            // Calculated heights based on DEFAULT_CONTENT_CELL_HEIGHT_CM for rows they span
+            { r: 5, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A6:A8
+            { r: 8, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true },  // A9:A11
+            { r: 11, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A12:A14
+            { r: 14, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A15:A17
+            { r: 17, c: 0, rowSpan: 2, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A18:A19
+            { r: 19, c: 0, rowSpan: 2, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A20:A21
+            { r: 21, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A22:A24
+            { r: 24, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A25:A27
+            { r: 27, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A28:A30
+            { r: 30, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A31:A33
+            { r: 33, c: 0, rowSpan: 3, colSpan: 1, className: 'header-left-general', calculatedHeight: true, editable: true }, // A34:P36
+
+            // A37:O37 (merged footer) - Height 73px
+            { r: 36, c: 0, rowSpan: 1, colSpan: 15, className: 'footer-bottom-merged', specificHeight: '73px', editable: true },
+            // P37 (footer cell) - Height 73px
+            { r: 36, c: 15, rowSpan: 1, colSpan: 1, className: 'footer-bottom-P37', specificHeight: '73px', editable: true },
+
+            // P column merged cells
+            // Heights match their A column counterparts, now calculated
+            { r: 1, c: 15, rowSpan: 4, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true },  // P2:P5 (matches A2:A5 height)
+            { r: 5, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true },  // P6:P8 (matches A6:A8 height)
+            { r: 8, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true },  // P9:P11
+            { r: 11, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P12:P14
+            { r: 14, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P15:P17
+            { r: 17, c: 15, rowSpan: 2, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P18:P19
+            { r: 19, c: 15, rowSpan: 2, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P20:P21
+            { r: 21, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P22:P24
+            { r: 24, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P25:P27
+            { r: 27, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P28:P30
+            { r: 30, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P31:P33
+            { r: 33, c: 15, rowSpan: 3, colSpan: 1, className: 'p-column-merged', calculatedHeight: true, editable: true }, // P34:P36
+        ];
+
+        // This array keeps track of which cells are occupied by a merged cell
+        const mergedCellMap = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(false));
+
+        // --- Utility Functions ---
+        function showMessage(message) {
+            messageBoxText.textContent = message;
+            messageBoxOverlay.style.display = 'flex';
+        }
+
+        function hideMessageBox() {
+            messageBoxOverlay.style.display = 'none';
+        }
+
+        function showLoading(message = "Loading data...") {
+            loadingOverlay.textContent = message;
+            loadingOverlay.style.display = 'flex';
+        }
+
+        function hideLoading() {
+            loadingOverlay.style.display = 'none';
+        }
+
+        // --- Google Sheets API Functions ---
+
+        /**
+         * Loads data for a specific dateKey from Google Sheet.
+         * @param {string} dateKey - The date in 'YYYY-M-D' format.
+         * @returns {Promise<Array<Array<string>>>} - The 2D grid data or an empty array if not found.
+         */
+        async function loadGridDataFromSheet(dateKey) {
+            if (!gapi.client || !gapi.client.sheets || !gapi.client.sheets.spreadsheets) {
+                console.error("Google Sheets API client not loaded.");
+                return [];
+            }
+            showLoading("Loading note from Google Sheet...");
+            try {
+                // Fetch all data from the sheet to find the specific dateKey
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: 'Sheet1!A:B', // Assuming 'Date' in column A, 'CompressedGridData' in column B
+                });
+
+                const values = response.result.values;
+                if (!values || values.length === 0) {
+                    return []; // Sheet is empty
+                }
+
+                // Skip header row if it exists
+                const dataRows = values[0][0] === 'Date' ? values.slice(1) : values;
+
+                for (const row of dataRows) {
+                    if (row[0] === dateKey && row[1]) {
+                        try {
+                            return JSON.parse(row[1]); // Parse the compressed JSON string
+                        } catch (parseError) {
+                            console.error(`Error parsing JSON for date ${dateKey}:`, parseError);
+                            return []; // Return empty if JSON is corrupted
+                        }
+                    }
+                }
+                return []; // Date not found
+            } catch (error) {
+                console.error("Error loading grid data from Google Sheet:", error);
+                showMessage(`Failed to load data from Google Sheet: ${error.message || error.result.error.message}`);
+                return [];
+            } finally {
+                hideLoading();
+            }
+        }
+
+        /**
+         * Saves or updates grid data for a specific dateKey in Google Sheet.
+         * @param {string} dateKey - The date in 'YYYY-M-D' format.
+         * @param {Array<Array<string>>} gridData - The 2D grid data to save.
+         * @returns {Promise<void>}
+         */
+        async function saveGridDataToSheet(dateKey, gridData) {
+            if (!gapi.client || !gapi.client.sheets || !gapi.client.sheets.spreadsheets) {
+                console.error("Google Sheets API client not loaded.");
+                return;
+            }
+            showLoading("Saving note to Google Sheet...");
+            try {
+                const compressedGridData = JSON.stringify(gridData);
+                const valuesToUpdate = [[dateKey, compressedGridData]];
+
+                // First, try to find the row to update
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: 'Sheet1!A:A', // Only get dates
+                });
+
+                const existingDates = response.result.values ? response.result.values.flat() : [];
+                let rowIndex = -1;
+                // Check if header exists and adjust search
+                const hasHeader = existingDates.length > 0 && existingDates[0] === 'Date';
+                
+                for (let i = 0; i < existingDates.length; i++) {
+                    if (existingDates[i] === dateKey) {
+                        rowIndex = i + 1; // +1 because sheet rows are 1-indexed
+                        break;
+                    }
+                }
+
+                if (rowIndex !== -1) {
+                    // Update existing row
+                    await gapi.client.sheets.spreadsheets.values.update({
+                        spreadsheetId: SPREADSHEET_ID,
+                        range: `Sheet1!A${rowIndex}:B${rowIndex}`,
+                        valueInputOption: 'RAW',
+                        resource: {
+                            values: valuesToUpdate,
+                        },
+                    });
+                    showMessage('Grid data updated successfully in Google Sheet!');
+                } else {
+                    // Append new row
+                    await gapi.client.sheets.spreadsheets.values.append({
+                        spreadsheetId: SPREADSHEET_ID,
+                        range: 'Sheet1!A:B',
+                        valueInputOption: 'RAW',
+                        resource: {
+                            values: valuesToUpdate,
+                        },
+                    });
+
+                    // Check if header needs to be added for first entry
+                    if (!hasHeader && existingDates.length === 0) {
+                        // Batch update to insert header and move existing data to second row
+                        await gapi.client.sheets.spreadsheets.batchUpdate({
+                            spreadsheetId: SPREADSHEET_ID,
+                            resource: {
+                                requests: [
+                                    {
+                                        insertDimension: {
+                                            range: {
+                                                sheetId: 0, // Assuming first sheet
+                                                dimension: 'ROWS',
+                                                startIndex: 0,
+                                                endIndex: 1
+                                            },
+                                            inheritFromBefore: false
+                                        }
+                                    },
+                                    {
+                                        updateCells: { // Write header
+                                            sheetId: 0,
+                                            rows: [
+                                                { values: [{ userEnteredValue: { stringValue: 'Date' } }, { userEnteredValue: { stringValue: 'CompressedGridData' } }] }
+                                            ],
+                                            start: { rowIndex: 0, columnIndex: 0 }
+                                        }
+                                    }
+                                ]
+                            }
+                        });
+                    }
+                    showMessage('Grid data saved successfully to Google Sheet!');
+                }
+            } catch (error) {
+                console.error("Error saving grid data to Google Sheet:", error);
+                showMessage(`Failed to save data to Google Sheet: ${error.message || error.result.error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+
+        /**
+         * Deletes grid data for a specific dateKey from Google Sheet.
+         * @param {string} dateKey - The date in 'YYYY-M-D' format.
+         * @returns {Promise<void>}
+         */
+        async function deleteGridDataFromSheet(dateKey) {
+            if (!gapi.client || !gapi.client.sheets || !gapi.client.sheets.spreadsheets) {
+                console.error("Google Sheets API client not loaded.");
+                return;
+            }
+            showLoading("Deleting note from Google Sheet...");
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: 'Sheet1!A:A',
+                });
+
+                const existingDates = response.result.values ? response.result.values.flat() : [];
+                let rowIndex = -1;
+                // Check if header exists and adjust search
+                const hasHeader = existingDates.length > 0 && existingDates[0] === 'Date';
+                
+                for (let i = 0; i < existingDates.length; i++) {
+                    if (existingDates[i] === dateKey) {
+                        rowIndex = i + 1; // +1 because sheet rows are 1-indexed
+                        break;
+                    }
+                }
+
+                if (rowIndex !== -1) {
+                    await gapi.client.sheets.spreadsheets.batchUpdate({
+                        spreadsheetId: SPREADSHEET_ID,
+                        resource: {
+                            requests: [{
+                                deleteDimension: {
+                                    range: {
+                                        sheetId: 0, // Assuming first sheet
+                                        dimension: 'ROWS',
+                                        startIndex: rowIndex - 1, // API is 0-indexed for startIndex
+                                        endIndex: rowIndex
+                                    }
+                                }
+                            }]
+                        }
+                    });
+                    showMessage('Existing note removed from Google Sheet.');
+                } else {
+                    showMessage('No data found for this date to delete.');
+                }
+            } catch (error) {
+                console.error("Error deleting grid data from Google Sheet:", error);
+                showMessage(`Failed to delete data from Google Sheet: ${error.message || error.result.error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+
+        // --- UI Update Functions ---
+        async function updateNoteIndicators() {
+            if (!gisInited || !gapiInited || !googleUser) {
+                // If not signed in or APIs not loaded, cannot update indicators from sheet
+                // Clear existing indicators if any
+                document.querySelectorAll('.day.has-note').forEach(day => {
+                    day.classList.remove('has-note');
+                });
+                return;
+            }
+
+            showLoading("Checking notes from Google Sheet...");
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: 'Sheet1!A:A', // Only fetch the Date column
+                });
+
+                const values = response.result.values;
+                const existingNotes = new Set();
+                if (values && values.length > 0) {
+                    // Skip header row if it exists
+                    const dataRows = values[0][0] === 'Date' ? values.slice(1) : values;
+                    dataRows.forEach(row => {
+                        const dateKey = row[0];
+                        if (dateKey && dateKey.startsWith(`${currentYear}-`)) { // Client-side filter for current year
+                            existingNotes.add(dateKey);
+                        }
+                    });
+                }
+
+                document.querySelectorAll('.day').forEach(day => {
+                    const dateKey = day.dataset.dateKey;
+                    if (existingNotes.has(dateKey)) {
+                        day.classList.add('has-note');
+                    } else {
+                        day.classList.remove('has-note');
+                    }
+                });
+            } catch (e) {
+                console.error("Error updating note indicators from Google Sheet:", e);
+                showMessage(`Failed to load note indicators: ${e.message || e.result.error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function buildCalendar(year) {
+            monthsEl.innerHTML = '';
+            yearDisplay.textContent = year;
+            const fragment = document.createDocumentFragment();
+
+            for (let m = 0; m < 12; m++) {
+                const firstDay = new Date(year, m, 1);
+                const startDow = firstDay.getDay();
+                const daysInMonth = new Date(year, m + 1, 0).getDate();
+                
+                const container = document.createElement('div');
+                container.className = 'month';
+                
+                const head = document.createElement('div');
+                head.className = 'month-name';
+                head.textContent = monthNames[m];
+                container.appendChild(head);
+                
+                const weekRow = document.createElement('div');
+                weekRow.className = 'grid';
+                weekdayNames.forEach(w => {
+                    const e = document.createElement('div');
+                    e.className = 'weekday';
+                    e.textContent = w;
+                    weekRow.appendChild(e);
+                });
+                container.appendChild(weekRow);
+                
+                const grid = document.createElement('div');
+                grid.className = 'grid';
+                
+                for (let i = 0; i < startDow; i++) {
+                    grid.appendChild(createDay('', true));
+                }
+                
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateKey = `${year}-${m + 1}-${d}`;
+                    const dayEl = createDay(d, false, dateKey);
+                    
+                    if (current.getFullYear() === year && current.getMonth() === m && current.getDate() === d) {
+                        dayEl.classList.add('today');
+                    }
+                    
+                    grid.appendChild(dayEl);
+                }
+                
+                container.appendChild(grid);
+                fragment.appendChild(container);
+            }
+            monthsEl.appendChild(fragment);
+            updateNoteIndicators(); // Call to update indicators after calendar build
+        }
+
+        function createDay(text, isMuted, key = '') {
+            const d = document.createElement('div');
+            d.className = `day ${isMuted ? 'muted' : ''}`;
+            d.textContent = text;
+            d.dataset.dateKey = key;
+            if (key) {
+                d.addEventListener('click', () => openNotePopup(key));
+            }
+            return d;
+        }
+
+        // Helper to calculate height for merged cells based on content cell height
+        function getCalculatedHeight(rowSpan) {
+            // Calculates height based on the number of rows it spans and the default content cell height
+            // This also implicitly handles the 1px border for each row in the calculation.
+            return `calc(${rowSpan * DEFAULT_CONTENT_CELL_HEIGHT_CM}cm + ${rowSpan * 2}px)`; /* Added 2px per row for border */
+        }
+
+        // --- Grid Functions ---
+        function initializeSheetGrid() {
+            sheetGrid.innerHTML = ''; // Clear previous content
+            // Set grid template columns: A (merged-width), B-O (14x default-width), P (merged-width)
+            // Now using flexible units (fr) to fill available space proportionally
+            sheetGrid.style.gridTemplateColumns = `2fr repeat(14, 1fr) 2fr`;
+
+            // Reset merged cell map for new initialization
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    mergedCellMap[r][c] = false;
+                }
+            }
+
+            // Create cells row by row, column by column
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    // Check if this cell is already part of a merged cell (from a previous iteration creating a merged cell)
+                    if (mergedCellMap[r][c]) {
+                        continue; // Skip creating this cell as it's covered by a merged cell
+                    }
+
+                    let isMerged = false;
+                    let mergedConfig = null;
+
+                    // Find if current (r, c) is the start of any defined merged cell
+                    for (const config of MERGED_CELLS) {
+                        if (config.r === r && config.c === c) {
+                            isMerged = true;
+                            mergedConfig = config;
+                            break;
+                        }
+                    }
+
+                    const cell = document.createElement('div');
+                    cell.className = 'sheet-cell'; // Base class for all cells
+                    cell.contentEditable = (isMerged && mergedConfig.editable === false) ? "false" : "true"; // Explicitly set contentEditable
+
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    if (isMerged) {
+                        cell.style.gridColumn = `span ${mergedConfig.colSpan}`;
+                        cell.style.gridRow = `span ${mergedConfig.rowSpan}`;
+                        
+                        // Apply specific class for styling (colors, etc.)
+                        if (mergedConfig.className) {
+                            cell.classList.add(mergedConfig.className);
+                        }
+                        // Apply specific height if defined, else calculate
+                        if (mergedConfig.specificHeight) {
+                            cell.style.minHeight = mergedConfig.specificHeight;
+                        } else if (mergedConfig.calculatedHeight) {
+                            cell.style.minHeight = getCalculatedHeight(mergedConfig.rowSpan);
+                        }
+
+                        // Set initial text if provided (e.g., "Total SKU") and control editability
+                        if (mergedConfig.text) { 
+                            cell.textContent = mergedConfig.text;
+                        }
+
+                        // Mark all cells covered by this merged cell in the map
+                        for (let mr = r; mr < r + mergedConfig.rowSpan; mr++) {
+                            for (let mc = c; mc < c + mergedConfig.colSpan; mc++) {
+                                if (mr < GRID_ROWS && mc < GRID_COLS) {
+                                    mergedCellMap[mr][mc] = true;
+                                }
+                            }
+                        }
+                    } else {
+                        // These are the B2:O36 general content cells
+                        // No extra classes needed here, base .sheet-cell styling applies (11px font, 0.45cm height)
+                    }
+                    
+                    // Attach event listeners for all cells (merged or not, if editable)
+                    if (cell.contentEditable === 'true') { 
+                        cell.addEventListener('input', (e) => {
+                            const cellRow = parseInt(e.target.dataset.row);
+                            const cellCol = parseInt(e.target.dataset.col);
+                            if (!currentGridData[cellRow]) {
+                                currentGridData[cellRow] = Array(GRID_COLS).fill('');
+                            }
+                            currentGridData[cellRow][cellCol] = e.target.textContent;
+                        });
+                        cell.addEventListener('paste', handleCellPaste);
+                    }
+
+                    sheetGrid.appendChild(cell);
+                }
+            }
+        }
+
+        function loadSheetGridData(data) {
+            // Ensure the data structure matches grid dimensions, pad with empty strings if needed
+            currentGridData = Array(GRID_ROWS).fill(null).map((_, r) => {
+                const rowData = data[r] || [];
+                return Array(GRID_COLS).fill('').map((_, c) => rowData[c] || '');
+            });
+
+            // Update DOM cells, being careful with merged cells
+            sheetGrid.querySelectorAll('.sheet-cell').forEach(cellElement => {
+                const r = parseInt(cellElement.dataset.row);
+                const c = parseInt(cellElement.dataset.col);
+
+                // Check if this cell is the top-left most cell of a merged block OR a regular (non-merged) cell
+                let isTopLeftOfMerge = false;
+                for (const config of MERGED_CELLS) {
+                    if (config.r === r && config.c === c) {
+                        isTopLeftOfMerge = true;
+                        break;
+                    }
+                }
+                const isRegularCell = !mergedCellMap[r][c]; // True if it's not part of any merged area
+
+                // Only update if it's an editable cell and the correct target (top-left or regular)
+                if (cellElement.contentEditable === 'true' && (isTopLeftOfMerge || isRegularCell)) {
+                    if (currentGridData[r] && currentGridData[r][c] !== undefined) {
+                        cellElement.textContent = currentGridData[r][c];
+                    } else {
+                        cellElement.textContent = ''; // Clear cell if no data
+                    }
+                }
+            });
+        }
+
+        function handleCellPaste(e) {
+            e.preventDefault(); // Prevent the default paste behavior
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            console.log("Pasted Text (from clipboard):", `"${pastedText}"`);
+
+            const targetCell = e.target;
+            const startRow = parseInt(targetCell.dataset.row);
+            const startCol = parseInt(targetCell.dataset.col);
+            console.log("Paste initiated at cell (DOM element dataset):", `R${startRow}, C${startCol}`);
+
+            const rows = pastedText.split(/\r?\n/);
+            const processedMergedCellsForThisPaste = new Set(); // To prevent overwriting the same merged cell multiple times
+
+            rows.forEach((rowContent, rIdx) => {
+                const cells = rowContent.split('\t');
+                cells.forEach((cellContent, cIdx) => {
+                    const logicalRow = startRow + rIdx;
+                    const logicalCol = startCol + cIdx;
+
+                    console.log(`--- Processing content: '${cellContent}' for logical cell R${logicalRow}, C${logicalCol} ---`);
+
+                    if (logicalRow < GRID_ROWS && logicalCol < GRID_COLS) {
+                        let actualPasteRow = logicalRow;
+                        let actualPasteCol = logicalCol;
+                        let mergedConfigForThisCell = null;
+
+                        // Find if this logical cell is part of any merged cell
+                        for (const config of MERGED_CELLS) {
+                            if (logicalRow >= config.r && logicalRow < config.r + config.rowSpan &&
+                                logicalCol >= config.c && logicalCol < config.c + config.colSpan) {
+                                mergedConfigForThisCell = config;
+                                actualPasteRow = config.r; // Redirect to top-left of merged cell
+                                actualPasteCol = config.c; // Redirect to top-left of merged cell
+                                console.log(`  -> Logical cell R${logicalRow}, C${logicalCol} is part of merged cell starting at R${actualPasteRow}, C${actualPasteCol}`);
+                                break;
+                            }
+                        }
+
+                        // --- Per-merge dedupe logic ---
+                        if (mergedConfigForThisCell) {
+                            const mergedCellKey = `${mergedConfigForThisCell.r},${mergedConfigForThisCell.c}`;
+                            if (processedMergedCellsForThisPaste.has(mergedCellKey)) {
+                                console.log(`  -> Merged cell at ${mergedCellKey} already processed for this paste. Skipping.`);
+                                return; // Skip this cell content, it's already handled by the first entry into this merged block
+                            }
+                            processedMergedCellsForThisPaste.add(mergedCellKey);
+                        }
+                        // --- End Per-merge dedupe logic ---
+
+
+                        const cellElement = sheetGrid.querySelector(`[data-row="${actualPasteRow}"][data-col="${actualPasteCol}"]`);
+                        console.log("  -> Target DOM cell element for paste:", cellElement);
+                        
+                        if (cellElement) {
+                            console.log("  -> Target DOM cell contentEditable attribute:", cellElement.getAttribute('contenteditable'));
+                            console.log("  -> Target DOM cell contentEditable property:", cellElement.contentEditable);
+                        }
+                        
+                        if (cellElement && cellElement.contentEditable === 'true') { 
+                            console.log(`  -> Pasting '${cellContent}' into editable cell R${actualPasteRow}, C${actualPasteCol}`);
+                            
+                            // Directly set textContent for reliability
+                            cellElement.textContent = cellContent; 
+                            
+                            // Update internal data model
+                            if (!currentGridData[actualPasteRow]) {
+                                currentGridData[actualPasteRow] = Array(GRID_COLS).fill('');
+                            }
+                            currentGridData[actualPasteRow][actualPasteCol] = cellContent;
+                            console.log(`  -> Successfully set textContent for R${actualPasteRow}, C${actualPasteCol}`);
+
+                        } else {
+                            if (cellElement) {
+                                console.log(`  -> Cell R${actualPasteRow}, C${actualPasteCol} is not editable (contentEditable: ${cellElement.contentEditable}). Skipping paste.`);
+                            } else {
+                                console.log(`  -> Cell R${actualPasteRow}, C${actualPasteCol} (DOM element) not found. Skipping paste.`);
+                            }
+                        }
+                    } else {
+                        console.log(`  -> Logical cell R${logicalRow}, C${logicalCol} is out of bounds (${GRID_ROWS}x${GRID_COLS}). Skipping paste.`);
+                    }
+                });
+            });
+        }
+
+        // --- Popup Handling ---
+        async function openNotePopup(key) {
+            if (!googleUser) {
+                showMessage("Please sign in with your Google account first.");
+                return;
+            }
+
+            selectedDateKey = key;
+            const [year, month, day] = key.split('-');
+            const dateStr = `${monthNames[month - 1]} ${day}, ${year}`;
+            popupDate.textContent = dateStr;
+
+            currentGridData = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(''));
+            initializeSheetGrid(); // Initialize an empty grid structure
+
+            showLoading("Loading note from Google Sheet...");
+            try {
+                const data = await loadGridDataFromSheet(key);
+                if (data && data.length > 0) {
+                    loadSheetGridData(data);
+                    saveBtn.style.display = 'none';
+                    updateBtn.style.display = 'inline-block';
+                } else {
+                    saveBtn.style.display = 'inline-block';
+                    updateBtn.style.display = 'none';
+                    loadSheetGridData(currentGridData); // Load empty grid if no data
+                }
+            } catch (e) {
+                console.error("Error opening note popup:", e);
+                showMessage(`Failed to load note: ${e.message}`);
+            } finally {
+                hideLoading();
+            }
+            
+            notePopupOverlay.style.display = 'flex';
+        }
+
+        function closeNotePopup() {
+            notePopupOverlay.style.display = 'none';
+            currentGridData = []; // Clear current grid data when closing
+            sheetGrid.innerHTML = ''; // Clear DOM grid
+            updateNoteIndicators(); // Update dot indicators on calendar
+        }
+        
+        function openYearPopup() {
+            yearListEl.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            const yearRange = 25; // Display 25 years before and after the current year
+            
+            for (let y = currentYear - yearRange; y <= currentYear + yearRange; y++) {
+                const yearItem = document.createElement('div');
+                yearItem.className = 'year-item';
+                yearItem.textContent = y;
+                
+                if (y === currentYear) {
+                    yearItem.classList.add('active');
+                } else {
+                    yearItem.classList.add('muted');
+                }
+                
+                yearItem.addEventListener('click', () => {
+                    currentYear = y;
+                    buildCalendar(currentYear);
+                    closeYearPopup();
+                });
+                fragment.appendChild(yearItem);
+            }
+            yearListEl.appendChild(fragment);
+            yearPopupOverlay.style.display = 'flex';
+            
+            // Scroll to the active year
+            setTimeout(() => {
+                const activeYearItem = yearListEl.querySelector('.year-item.active');
+                if (activeYearItem) {
+                    activeYearItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+
+        function closeYearPopup() {
+            yearPopupOverlay.style.display = 'none';
+        }
+
+        // --- Event Listeners ---
+        saveBtn.addEventListener('click', async () => {
+            if (!googleUser) {
+                showMessage("Please sign in with your Google account first.");
+                return;
+            }
+            const hasContent = currentGridData.some(row => row && row.some(cellContent => cellContent && String(cellContent).trim() !== ''));
+            
+            if (hasContent) {
+                await saveGridDataToSheet(selectedDateKey, currentGridData);
+            } else {
+                // If no content, treat as deletion
+                await deleteGridDataFromSheet(selectedDateKey);
+            }
+            closeNotePopup();
+        });
+
+        updateBtn.addEventListener('click', async () => {
+            if (!googleUser) {
+                showMessage("Please sign in with your Google account first.");
+                return;
+            }
+            const hasContent = currentGridData.some(row => row && row.some(cellContent => cellContent && String(cellContent).trim() !== ''));
+            
+            if (hasContent) {
+                await saveGridDataToSheet(selectedDateKey, currentGridData); // Update uses save logic
+            } else {
+                // If no content, treat as deletion
+                await deleteGridDataFromSheet(selectedDateKey);
+            }
+            closeNotePopup();
+        });
+
+        cancelBtn.addEventListener('click', closeNotePopup);
+        messageBoxCloseBtn.addEventListener('click', hideMessageBox);
+
+        notePopupOverlay.addEventListener('click', (e) => {
+            if (e.target === notePopupOverlay) {
+                closeNotePopup();
+            }
+        });
+        
+        yearPopupCloseBtn.addEventListener('click', closeYearPopup);
+        
+        yearPopupOverlay.addEventListener('click', (e) => {
+            if (e.target === yearPopupOverlay) {
+                closeYearPopup();
+            }
+        });
+
+        // Mouse wheel scrolling for months container
+        monthsContainer.addEventListener('wheel', (e) => {
+            e.preventDefault(); // Default ब्राउज़र स्क्रॉलिंग को रोकता है
+            monthsContainer.scrollBy({
+                top: e.deltaY, // सामान्य माउस व्हील गति
+                behavior: 'smooth' // स्मूथ स्क्रॉलिंग इफ़ेक्ट
+            });
+        }, { passive: false }); // `passive: false` ensures `preventDefault()`() works
+
+        // Smooth scroll fix for sheetGrid as per user suggestion
+        sheetGridContainer.addEventListener("wheel", function(e) { // Event listener moved to sheetGridContainer for proper overflow
+            e.preventDefault();
+            this.scrollBy({
+                top: e.deltaY < 0 ? -60 : 60, // scroll speed set कर सकते हो
+                behavior: "smooth"
+            });
+        }, { passive: false }); // `passive: false` ensures `preventDefault()` works
+
+        yearDisplay.addEventListener('click', openYearPopup);
+        
+        prevYearBtn.addEventListener('click', () => {
+            currentYear--;
+            buildCalendar(currentYear);
+        });
+
+        nextYearBtn.addEventListener('click', () => {
+            currentYear++;
+            buildCalendar(currentYear);
+        });
+
+        // --- Google Sign-in Functions ---
+        /**
+         * Callback after Google API client is loaded.
+         */
+        function gapiLoaded() {
+            gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: DISCOVERY_DOCS,
+            }).then(() => {
+                gapiInited = true;
+                // gisLoaded is called separately, so check both flags
+                if (gisInited && gapiInited) {
+                    checkAuth(); // Check auth status once both libs are loaded
+                }
+            }).catch(error => {
+                console.error("Error loading GAPI client:", error);
+                showMessage(`Error loading Google API client: ${error.message}`);
+            });
+        }
+
+        /**
+         * Callback after Google Identity Services is loaded.
+         */
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (tokenResponse) => {
+                    if (tokenResponse.error) {
+                        throw (tokenResponse);
+                    }
+                    gapi.client.setToken(tokenResponse);
+                    googleUser = tokenResponse; // Store the user token for later use
+                    updateSigninStatus(true);
+                },
+            });
+            gisInited = true;
+            if (gisInited && gapiInited) {
+                checkAuth(); // Check auth status once both libs are loaded
+            }
+        }
+
+        /**
+         * Handles the Google Sign-in process.
+         */
+        function handleAuthClick() {
+            if (googleUser) { // If already signed in, this button becomes Sign Out
+                handleSignoutClick();
+            } else {
+                tokenClient.requestAccessToken(); // Request access token for sign-in
+            }
+        }
+
+        /**
+         * Handles the Google Sign-out process.
+         */
+        function handleSignoutClick() {
+            if (googleUser) {
+                google.accounts.oauth2.revoke(gapi.client.getToken().access_token, () => {
+                    console.log('User signed out.');
+                    gapi.client.setToken(''); // Clear token
+                    googleUser = null; // Clear user
+                    updateSigninStatus(false);
+                });
+            }
+        }
+
+        /**
+         * Updates the UI based on the sign-in status.
+         * @param {boolean} isSignedIn - True if the user is signed in, false otherwise.
+         */
+        function updateSigninStatus(isSignedIn) {
+            if (isSignedIn) {
+                googleAuthStatus.textContent = `Signed in as: ${googleUser.email || 'Google User'}`; // Display user email if available
+                authButton.textContent = 'Sign Out';
+                authButton.classList.remove('signed-out');
+                buildCalendar(currentYear); // Load calendar and indicators for signed-in user
+            } else {
+                googleAuthStatus.textContent = 'Not signed in';
+                authButton.textContent = 'Sign In with Google';
+                authButton.classList.add('signed-out');
+                buildCalendar(currentYear); // Rebuild calendar to clear note indicators
+            }
+        }
+
+        /**
+         * Checks if the user is already signed in on load and updates status.
+         */
+        function checkAuth() {
+            // This is a simplified check. For persistent sign-in, you'd typically manage tokens
+            // in local storage or use a server-side flow. Here, we just assume if a token is present,
+            // the user is "signed in" for this session.
+            const token = gapi.client.getToken();
+            if (token && token.access_token) {
+                 // You might need to make a small API call (e.g., to get user info)
+                 // to fully verify if the token is still valid.
+                 // For now, we'll assume it's valid if present.
+                 // A simple way to get user info if needed:
+                 gapi.client.request({
+                    path: 'https://www.googleapis.com/oauth2/v1/userinfo',
+                    method: 'GET',
+                 }).then(response => {
+                    googleUser = { ...token, email: response.result.email, name: response.result.name };
+                    updateSigninStatus(true);
+                 }).catch(error => {
+                    console.error("Failed to get user info with existing token:", error);
+                    googleUser = null;
+                    updateSigninStatus(false);
+                 });
+            } else {
+                googleUser = null;
+                updateSigninStatus(false);
+            }
+        }
+
+        // --- Initialization ---
+        function initApp() {
+            // Load Google API client library
+            gapi.load('client', gapiLoaded);
+            // Load Google Identity Services library
+            google.accounts.oauth2.load(gisLoaded);
+            
+            authButton.addEventListener('click', handleAuthClick);
+            buildCalendar(currentYear); // Initial calendar build before auth status is fully determined
+        }
+
+        // Initialize the app on window load
+        window.onload = initApp;
+    </script>
+</body>
+</html>
